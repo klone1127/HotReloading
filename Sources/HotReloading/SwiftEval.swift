@@ -154,6 +154,7 @@ public class SwiftEval: NSObject {
         return instance
     }
 
+    @objc public var sign = "-"
     @objc public var signer: ((_: String) -> Bool)?
     @objc public var vaccineEnabled: Bool = false
 
@@ -422,6 +423,12 @@ public class SwiftEval: NSObject {
             compileByClass.removeValue(forKey: classNameOrFile)
             throw scriptError("Re-compilation")
         }
+        
+        guard shell(command: """
+            \(xcodeDev)/Toolchains/XcodeDefault.xctoolchain/usr/bin/nm \(tmpfile).o | grep -E ' S _OBJC_CLASS_\\$_| _(_T0|\\$S|\\$s).*CN$' | awk '{print $3}' >\(tmpfile).classes
+            """) else {
+            throw evalError("Could not list class symbols")
+        }
 
         compileByClass[classNameOrFile] = (compileCommand, sourceFile)
         if SwiftEval.longTermCache[classNameOrFile] as? String != compileCommand && classNameOrFile.hasPrefix("/") {
@@ -476,7 +483,7 @@ public class SwiftEval: NSObject {
             }
             #else
             guard shell(command: """
-                export CODESIGN_ALLOCATE=\(xcodeDev)/Toolchains/XcodeDefault.xctoolchain/usr/bin/codesign_allocate; codesign --force -s '-' "\(tmpfile).dylib"
+                export CODESIGN_ALLOCATE=\(xcodeDev)/Toolchains/XcodeDefault.xctoolchain/usr/bin/codesign_allocate; codesign --force -s '\(sign)' "\(tmpfile).dylib"
                 """) else {
                 throw evalError("Codesign failed")
             }
@@ -581,11 +588,13 @@ public class SwiftEval: NSObject {
     // Overridden by SwiftInjectionEval subclass for injection
     @objc func extractClasses(dl: UnsafeMutableRawPointer,
                               tmpfile: String) throws -> [AnyClass] {
+        #if !arch(arm64)
         guard shell(command: """
             \(xcodeDev)/Toolchains/XcodeDefault.xctoolchain/usr/bin/nm \(tmpfile).o | grep -E ' S _OBJC_CLASS_\\$_| _(_T0|\\$S|\\$s).*CN$' | awk '{print $3}' >\(tmpfile).classes
             """) else {
             throw evalError("Could not list class symbols")
         }
+        #endif
         guard var classSymbolNames = (try? String(contentsOfFile: "\(tmpfile).classes"))?.components(separatedBy: "\n") else {
             throw evalError("Could not load class symbol list")
         }
@@ -758,7 +767,7 @@ public class SwiftEval: NSObject {
         return derivedDataPath(realYear, pathSelector)
     }
 
-    func findDerivedData(url: URL, ideProcPath: String) -> URL? {
+    @objc public func findDerivedData(url: URL, ideProcPath: String) -> URL? {
         if url.path == "/" {
             return nil
         }
