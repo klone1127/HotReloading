@@ -21,6 +21,8 @@
 
 + (instancetype _Nullable)connectTo:(NSString *_Nonnull)address;
 + (BOOL)parseV4Address:(NSString *_Nonnull)address into:(struct sockaddr_storage *_Nonnull)serverAddr;
++ (nullable NSString *)getIPAddress;
++ (BOOL)isValidIPAddress:(NSString *_Nullable)address;
 
 - (instancetype _Nonnull)initSocket:(int)socket;
 

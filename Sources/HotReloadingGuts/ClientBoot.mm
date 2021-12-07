@@ -34,7 +34,20 @@ NSString *INJECTION_KEY = @__FILE__;
     for (int i=0, retrys=3; i<retrys; i++) {
         if (i)
             [NSThread sleepForTimeInterval:1.0];
-        if (SimpleSocket *client = [clientClass connectTo:@INJECTION_ADDRESS]) {
+        
+        #ifdef __arm64__
+            NSString *ip = nil;
+            NSString *ipFile = [[NSBundle bundleForClass:[self class]] pathForResource:@"ip" ofType:nil];
+            if ([[NSFileManager defaultManager] fileExistsAtPath:ipFile])
+                ip = [[NSString stringWithContentsOfFile:ipFile encoding:NSUTF8StringEncoding error:nil]
+                      stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if (![SimpleSocket isValidIPAddress:ip])
+                printf("💉 Not found \"ip\" file containing the Mac IP address in the bundle. The connection may fail.");
+        #else
+            NSString *ip = [SimpleSocket getIPAddress];
+        #endif
+        NSString *address = ip ? [ip stringByAppendingString:[NSString stringWithFormat:@"%s", INJECTION_PORT]] : [NSString stringWithFormat:@"%s", INJECTION_PORT];
+        if (SimpleSocket *client = [clientClass connectTo:address]) {
             [client run];
             return;
         }

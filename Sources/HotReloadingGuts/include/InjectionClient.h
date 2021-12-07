@@ -18,13 +18,13 @@
 #endif
 
 #ifdef INJECTION_III_APP
-#define INJECTION_ADDRESS ":8898"
+#define INJECTION_PORT ":8898"
 #import "/tmp/InjectionIIISalt.h"
 #define INJECTION_KEY @"bvijkijyhbtrbrebzjbbzcfbbvvq"
 #define APP_NAME "InjectionIII"
 #define APP_PREFIX "💉 "
 #else
-#define INJECTION_ADDRESS ":8899"
+#define INJECTION_PORT ":8899"
 #define INJECTION_SALT 2122172543
 extern NSString *INJECTION_KEY;
 #define APP_NAME "HotReloading"

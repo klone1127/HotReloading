@@ -33,6 +33,16 @@ public class InjectionClient: SimpleSocket {
         let frameworksPath = Bundle.main.privateFrameworksPath!
         write(builder.tmpDir)
         write(builder.arch)
+        #if arch(arm64)
+        var sign = "-"
+        let signFile = Bundle(for: self).path(forResource: "sign", ofType: nil)
+        if FileManager.default.fileExists(atPath: signFile) {
+            sign = String(contentsOfFile: signFile, encoding: .utf8).trimmingCharacters(in: Foundation.CharacterSet.newlines)
+        } else {
+            print("💉 Not found \"sign\" file containing the app sign in the bundle. The dylib load may fail.")
+        }
+        write(sign)
+        #endif
         write(Bundle.main.executablePath!)
 
         builder.tmpDir = readString() ?? "/tmp"
@@ -74,7 +84,15 @@ public class InjectionClient: SimpleSocket {
             self.writeCommand(InjectionResponse.sign.rawValue, with: dylib)
             return reader.readString() == "1"
         }
-
+        
+//        let fileManager = FileManager.default
+//        #if arch(arm64)
+//        let injectDataPath = NSSearchPathForDirectoriesInDomains(.libraryDirectory, .userDomainMask, true).first ?? ""
+//        if fileManager.fileExists(atPath: injectDataPath) {
+//            fileManager.createDirectory(at: injectDataPath, withIntermediateDirectories: false, attributes: [:])
+//        }
+//        #endif
+        
         SwiftTrace.swizzleFactory = SwiftTrace.LifetimeTracker.self
         
         commandLoop:
@@ -240,10 +258,39 @@ public class InjectionClient: SimpleSocket {
     }
 
     func processOnMainThread(command: InjectionCommand, builder: SwiftEval) {
-        guard let changed = self.readString() else {
+        guard var changed = self.readString() else {
             print("\(APP_PREFIX)⚠️ Could not read changed filename?")
             return
         }
+        
+        let fileManager = FileManager.default
+        #if arch(arm64)
+        var injectDataPath = NSSearchPathForDirectoriesInDomains(.libraryDirectory, .userDomainMask, true).first ?? ""
+        if fileManager.fileExists(atPath: injectDataPath) {
+            fileManager.createDirectory(at: injectDataPath, withIntermediateDirectories: false, attributes: [:])
+        }
+        #endif
+        
+        if command == .load {
+#if arch(arm64)
+            var tmpFilePath = injectDataPath.appendingPathComponent(changed.lastPathComponent) ?? "" as NSString
+            var dylibPath = tmpFilePath.appendingPathExtension("dylib") ?? ""
+            fileManager.removeItem(atPath: dylibPath)
+            var dylibData = readData() as NSData
+            fileManager.createFile(atPath: dylibPath, contents: dylibData, attributes: nil)
+            changed = dylibPath.deletingPathExtension
+            let classes = tmpFilePath?.appendingPathExtension("classes")
+            fileManager.removeItem(atPath: classes)
+            let classData = readData() as NSData
+            fileManager.createFile(atPath: classes, contents: classData, attributes: nil)
+#else
+            let dylibString = (changed as NSString).appendingPathExtension("dylib") ?? ""
+            let dylibData = NSData(contentsOfFile: dylibString)
+            try? fileManager.removeItem(atPath: dylibString)
+            dylibData?.write(toFile: dylibString, atomically: true)
+#endif
+        }
+        
         DispatchQueue.main.async {
             var err: String?
             switch command {

@@ -80,7 +80,8 @@ class AppDelegate : NSObject, NSApplicationDelegate {
             updateItem.isHidden = true
         }
 
-        InjectionServer.startServer(INJECTION_ADDRESS)
+        let ip = SimpleSocket.getIPAddress() ?? ""
+        InjectionServer.startServer(ip.isEmpty ? INJECTION_PORT : "\(ip)\(INJECTION_PORT)")
 
         #if !SWIFT_PACKAGE
         if !FileManager.default.fileExists(atPath:

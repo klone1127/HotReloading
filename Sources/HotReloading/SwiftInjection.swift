@@ -226,7 +226,7 @@ public class SwiftInjection: NSObject {
             totalSwizzled += swizzled
 
             log("Injected class '\(_typeName(oldClass))' (\(patched),\(swizzled))")
-
+            #if !arch(arm64)
             if let XCTestCase = objc_getClass("XCTestCase") as? AnyClass,
                 newClass.isSubclass(of: XCTestCase) {
                 testClasses.append(newClass)
@@ -234,6 +234,7 @@ public class SwiftInjection: NSObject {
 //                [[objc_getClass("_TtC5Quick5World") sharedWorld]
 //                setCurrentExampleMetadata:nil];
             }
+            #endif
         }
 
         // log any value types being injected
@@ -291,6 +292,7 @@ public class SwiftInjection: NSObject {
 
         // Thanks https://github.com/johnno1962/injectionforxcode/pull/234
         if !testClasses.isEmpty {
+            #if !arch(arm64)
             testQueue.async {
                 testQueue.suspend()
                 let timer = Timer(timeInterval: 0, repeats:false, block: { _ in
@@ -301,6 +303,7 @@ public class SwiftInjection: NSObject {
                 })
                 RunLoop.main.add(timer, forMode: RunLoop.Mode.common)
             }
+            #endif
         } else {
             performSweep(oldClasses: oldClasses, tmpfile, injectedGenerics)
 

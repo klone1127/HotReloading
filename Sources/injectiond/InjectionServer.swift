@@ -17,9 +17,11 @@ import XprobeUI
 
 let commandQueue = DispatchQueue(label: "InjectionCommand")
 let compileQueue = DispatchQueue(label: "InjectionCompile")
+let injectionQueue = DispatchQueue(label: "InjectionQueue")
 
 var projectInjected = [String: [String: TimeInterval]]()
 let MIN_INJECTION_INTERVAL = 1.0
+let kDerivedDataBookmarkKey = "kDerivedDataBookmarkKey"
 
 public class InjectionServer: SimpleSocket {
     var fileChangeHandler: ((_ changed: NSArray, _ ideProcPath:String) -> Void)!
@@ -27,6 +29,7 @@ public class InjectionServer: SimpleSocket {
     var pending = [String]()
     var builder: SwiftEval!
     var lastIdeProcPath = ""
+    var derivedData: URL?
 
     override public class func error(_ message: String) -> Int32 {
         let saveno = errno
@@ -83,6 +86,11 @@ public class InjectionServer: SimpleSocket {
 
         if let arch = readString() {
             builder.arch = arch
+            if arch == "arm64" {
+                if let sign = readString() {
+                    builder.sign = sign
+                }
+            }
         } else { return }
 
         if appDelegate.isSandboxed {
@@ -115,6 +123,21 @@ public class InjectionServer: SimpleSocket {
         // Xcode specific config
         if let xcodeDevURL = appDelegate.runningXcodeDevURL {
             builder.xcodeDev = xcodeDevURL.path
+        }
+        
+        // locate derived data and ask permission
+        derivedData = builder.findDerivedData(url: URL(fileURLWithPath: NSHomeDirectory()), ideProcPath: builder.lastIdeProcPath)
+        if let derivedDataTemp = derivedData {
+            if ScopedBookmarkManager.bookmark(for: kDerivedDataBookmarkKey)?.path == derivedData?.path {
+                var permission = false
+                DispatchQueue.main.async {
+                    permission = DirectoryAccessHelper().askPermission(for: derivedDataTemp, bookmark: kDerivedDataBookmarkKey, app: "InjectionIII")
+                }
+                if !permission {
+                    print("Could not access derived data.")
+                    return
+                }
+            }
         }
 
         builder.projectFile = projectFile
@@ -298,10 +321,33 @@ public class InjectionServer: SimpleSocket {
                         self.sendCommand(.log, with: "\(APP_PREFIX)Error reding \(dylib).dylib")
                     }
                     #else
-                    self.sendCommand(.load, with: dylib)
+//                    self.sendCommand(.load, with: dylib)
+                    self.inject(with: dylib, .load)
                     #endif
                 } else {
                     appDelegate.setMenuIcon("InjectionError")
+                }
+            }
+        }
+    }
+    
+    public func inject(with source: String?, _ common: InjectionCommand) {
+        compileQueue.async {
+            if ScopedBookmarkManager.startAccessing(for: kDerivedDataBookmarkKey) {
+                ScopedBookmarkManager.stopAccessing(for: kDerivedDataBookmarkKey)
+                self.sendCommand(.load, with: source)
+                if self.builder.arch == "arm64" {
+                    if let tempSource = source {
+                        let dylibString = (tempSource as NSString).appendingPathExtension("dylib")
+                        if let dylibData = NSData(contentsOfFile: dylibString ?? "") {
+                            self.write(dylibData as Data)
+                        }
+                        
+                        let classes = (tempSource as NSString).appendingPathExtension("classes")
+                        if let classesData = NSData(contentsOfFile: classes ?? "") {
+                            self.write(classesData as Data)
+                        }
+                    }
                 }
             }
         }
@@ -338,6 +384,8 @@ public class InjectionServer: SimpleSocket {
         #endif
         if FileManager.default.fileExists(atPath: derivedLogs) {
             builder?.derivedLogs = derivedLogs
+        } else {
+            print("No derived logs Or Could not locate derived logs.")
         }
 
         sendCommand(.vaccineSettingChanged,
