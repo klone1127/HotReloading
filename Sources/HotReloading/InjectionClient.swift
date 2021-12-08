@@ -35,9 +35,10 @@ public class InjectionClient: SimpleSocket {
         write(builder.arch)
         #if arch(arm64)
         var sign = "-"
-        let signFile = Bundle(for: self).path(forResource: "sign", ofType: nil)
+        let signFile = Bundle(for: InjectionClient.self).path(forResource: "sign", ofType: nil) ?? ""
         if FileManager.default.fileExists(atPath: signFile) {
-            sign = String(contentsOfFile: signFile, encoding: .utf8).trimmingCharacters(in: Foundation.CharacterSet.newlines)
+            let tempSign = try? String(contentsOfFile: signFile, encoding: .utf8).trimmingCharacters(in: Foundation.CharacterSet.newlines)
+            sign = tempSign ?? "_"
         } else {
             print("💉 Not found \"sign\" file containing the app sign in the bundle. The dylib load may fail.")
         }
@@ -265,23 +266,23 @@ public class InjectionClient: SimpleSocket {
         
         let fileManager = FileManager.default
         #if arch(arm64)
-        var injectDataPath = NSSearchPathForDirectoriesInDomains(.libraryDirectory, .userDomainMask, true).first ?? ""
+        let injectDataPath = NSSearchPathForDirectoriesInDomains(.libraryDirectory, .userDomainMask, true).first ?? ""
         if fileManager.fileExists(atPath: injectDataPath) {
-            fileManager.createDirectory(at: injectDataPath, withIntermediateDirectories: false, attributes: [:])
+            try? fileManager.createDirectory(atPath: injectDataPath, withIntermediateDirectories: false, attributes: [:])
         }
         #endif
         
         if command == .load {
 #if arch(arm64)
-            var tmpFilePath = injectDataPath.appendingPathComponent(changed.lastPathComponent) ?? "" as NSString
-            var dylibPath = tmpFilePath.appendingPathExtension("dylib") ?? ""
-            fileManager.removeItem(atPath: dylibPath)
-            var dylibData = readData() as NSData
+            let tmpFilePath = (injectDataPath as NSString).appendingPathComponent((changed as NSString).lastPathComponent)
+            let dylibPath = (tmpFilePath as NSString).appendingPathExtension("dylib") ?? ""
+            try? fileManager.removeItem(atPath: dylibPath)
+            var dylibData = readData()
             fileManager.createFile(atPath: dylibPath, contents: dylibData, attributes: nil)
-            changed = dylibPath.deletingPathExtension
-            let classes = tmpFilePath?.appendingPathExtension("classes")
-            fileManager.removeItem(atPath: classes)
-            let classData = readData() as NSData
+            changed = (dylibPath as NSString).deletingPathExtension
+            let classes = (tmpFilePath as NSString).appendingPathExtension("classes") ?? ""
+            try? fileManager.removeItem(atPath: classes)
+            let classData = readData()
             fileManager.createFile(atPath: classes, contents: classData, attributes: nil)
 #else
             let dylibString = (changed as NSString).appendingPathExtension("dylib") ?? ""

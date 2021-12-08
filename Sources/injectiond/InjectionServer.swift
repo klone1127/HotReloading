@@ -17,7 +17,6 @@ import XprobeUI
 
 let commandQueue = DispatchQueue(label: "InjectionCommand")
 let compileQueue = DispatchQueue(label: "InjectionCompile")
-let injectionQueue = DispatchQueue(label: "InjectionQueue")
 
 var projectInjected = [String: [String: TimeInterval]]()
 let MIN_INJECTION_INTERVAL = 1.0

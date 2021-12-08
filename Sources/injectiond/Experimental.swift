@@ -348,6 +348,8 @@ extension AppDelegate {
                             let bundleName = "tvOSInjection.bundle"
                             #elseif targetEnvironment(simulator)
                             let bundleName = "iOSInjection.bundle"
+                            #elseif os(iOS)
+                            let bundleName = "iOSDeviceInjection.bundle"
                             #else
                             let bundleName = "maciOSInjection.bundle"
                             #endif
