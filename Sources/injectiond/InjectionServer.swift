@@ -97,6 +97,11 @@ public class InjectionServer: SimpleSocket {
         } else {
             builder.tmpDir = builder.frameworks
         }
+        // arm64  (真机下使用 /tmp)
+        if builder.arch == "arm64" {
+            builder.tmpDir = "/tmp/"
+        }
+        
         write(builder.tmpDir)
         NSLog("Using tmp dir: \(builder.tmpDir)")
 
@@ -111,7 +116,11 @@ public class InjectionServer: SimpleSocket {
         }
 
         builder.signer = {
-            let identity = appDelegate.defaults.string(forKey: projectFile)
+            var identity = appDelegate.defaults.string(forKey: projectFile)
+            // 真机时使用 sign签名
+            if self.builder.arch == "arm64" {
+                identity = self.builder.sign
+            }
             if identity != nil {
                 NSLog("Signing with identity: \(identity!)")
             }
@@ -132,10 +141,10 @@ public class InjectionServer: SimpleSocket {
                 DispatchQueue.main.async {
                     permission = DirectoryAccessHelper().askPermission(for: derivedDataTemp, bookmark: kDerivedDataBookmarkKey, app: "InjectionIII")
                 }
-                if !permission {
-                    print("Could not access derived data.")
-                    return
-                }
+//                if !permission {
+//                    print("Could not access derived data.")
+//                    return
+//                }
             }
         }
 

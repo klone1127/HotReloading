@@ -42,6 +42,7 @@ public class InjectionClient: SimpleSocket {
         } else {
             print("💉 Not found \"sign\" file containing the app sign in the bundle. The dylib load may fail.")
         }
+        print("💉 sign:\(sign), signFile:\(signFile)")
         write(sign)
         #endif
         write(Bundle.main.executablePath!)
@@ -266,9 +267,16 @@ public class InjectionClient: SimpleSocket {
         
         let fileManager = FileManager.default
         #if arch(arm64)
-        let injectDataPath = NSSearchPathForDirectoriesInDomains(.libraryDirectory, .userDomainMask, true).first ?? ""
-        if fileManager.fileExists(atPath: injectDataPath) {
-            try? fileManager.createDirectory(atPath: injectDataPath, withIntermediateDirectories: false, attributes: [:])
+        var injectDataPath = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true).first ?? ""
+        injectDataPath = (injectDataPath as NSString).appendingPathComponent("injectDatas")
+
+        var isDirectoryExist: ObjCBool = true
+        if !fileManager.fileExists(atPath: injectDataPath, isDirectory: &isDirectoryExist) {
+            do {
+                try fileManager.createDirectory(atPath: injectDataPath, withIntermediateDirectories: false, attributes: [:])
+            } catch let err {
+                print("文件夹创建失败 - \(injectDataPath): \(err.localizedDescription)")
+            }
         }
         #endif
         

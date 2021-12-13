@@ -47,6 +47,7 @@ NSString *INJECTION_KEY = @__FILE__;
             NSString *ip = [SimpleSocket getIPAddress];
         #endif
         NSString *address = ip ? [ip stringByAppendingString:[NSString stringWithFormat:@"%s", INJECTION_PORT]] : [NSString stringWithFormat:@"%s", INJECTION_PORT];
+        printf(APP_PREFIX"⚠️ 设备 address: %s \n", address.UTF8String);
         if (SimpleSocket *client = [clientClass connectTo:address]) {
             [client run];
             return;
