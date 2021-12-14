@@ -5,7 +5,7 @@
 //  Created by John Holdsworth on 02/11/2017.
 //  Copyright © 2017 John Holdsworth. All rights reserved.
 //
-//  $Id: //depot/HotReloading/Sources/HotReloading/SwiftEval.swift#11 $
+//  $Id: //depot/HotReloading/Sources/HotReloading/SwiftEval.swift#16 $
 //
 //  Basic implementation of a Swift "eval()" including the
 //  mechanics of recompiling a class and loading the new
@@ -459,7 +459,7 @@ public class SwiftEval: NSObject {
         }
 
         guard shell(command: """
-            "\(xcodeDev)/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang" -arch "\(arch)" -bundle -isysroot "\(xcodeDev)/Platforms/\(platform).platform/Developer/SDKs/\(platform).sdk" -L"\(toolchain)/usr/lib/swift/\(platform.lowercased())" \(osSpecific) -undefined dynamic_lookup -dead_strip -Xlinker -objc_abi_version -Xlinker 2 -fobjc-arc -fprofile-instr-generate "\(objectFile)" -L "\(frameworks)" -F "\(frameworks)" -rpath "\(frameworks)" -o \"\(tmpfile).dylib\" >>\"\(logfile)\" 2>&1
+            "\(xcodeDev)/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang" -arch "\(arch)" -bundle -isysroot "\(xcodeDev)/Platforms/\(platform).platform/Developer/SDKs/\(platform).sdk" -L"\(toolchain)/usr/lib/swift/\(platform.lowercased())" \(osSpecific) -undefined dynamic_lookup -dead_strip -Xlinker -objc_abi_version -Xlinker 2 -Xlinker -interposable -fobjc-arc -fprofile-instr-generate "\(objectFile)" -L "\(frameworks)" -F "\(frameworks)" -rpath "\(frameworks)" -o \"\(tmpfile).dylib\" >>\"\(logfile)\" 2>&1
             """) else {
             throw scriptError("Linking")
         }
@@ -548,16 +548,19 @@ public class SwiftEval: NSObject {
         print("\(APP_PREFIX)Loading .dylib ...")
         // load patched .dylib into process with new version of class
         guard let dl = dlopen("\(tmpfile).dylib", RTLD_NOW) else {
-            let error = String(cString: dlerror())
+            var error = String(cString: dlerror())
             if error.contains("___llvm_profile_runtime") {
-                print("\(APP_PREFIX)⚠️ Loading .dylib has failed, try turning off collection of test coverage in your scheme")
+                error += """
+                    \n\(APP_PREFIX)⚠️ Loading .dylib has failed, try turning off \
+                    collection of test coverage in your scheme
+                    """
             } else if error.contains("Symbol not found:") {
-                print("""
-                    \(APP_PREFIX)⚠️ Loading .dylib has failed, This is likely \
+                error += """
+                    \n\(APP_PREFIX)⚠️ Loading .dylib has failed, This is likely \
                     because Swift code being injected refers to a function \
                     with a default argument. Rebuilding and re-running your \
                     project (without a build clean) can resolve this.
-                    """)
+                    """
             }
             throw evalError("dlopen() error: \(error)")
         }
