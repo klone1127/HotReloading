@@ -135,18 +135,6 @@ public class InjectionServer: SimpleSocket {
         
         // locate derived data and ask permission
         derivedData = builder.findDerivedData(url: URL(fileURLWithPath: NSHomeDirectory()), ideProcPath: builder.lastIdeProcPath)
-        if let derivedDataTemp = derivedData {
-            if ScopedBookmarkManager.bookmark(for: kDerivedDataBookmarkKey)?.path == derivedData?.path {
-                var permission = false
-                DispatchQueue.main.async {
-                    permission = DirectoryAccessHelper().askPermission(for: derivedDataTemp, bookmark: kDerivedDataBookmarkKey, app: "InjectionIII")
-                }
-//                if !permission {
-//                    print("Could not access derived data.")
-//                    return
-//                }
-            }
-        }
 
         builder.projectFile = projectFile
 
@@ -341,8 +329,6 @@ public class InjectionServer: SimpleSocket {
     
     public func inject(with source: String?, _ common: InjectionCommand) {
         compileQueue.async {
-            if ScopedBookmarkManager.startAccessing(for: kDerivedDataBookmarkKey) {
-                ScopedBookmarkManager.stopAccessing(for: kDerivedDataBookmarkKey)
                 self.sendCommand(.load, with: source)
                 if self.builder.arch == "arm64" {
                     if let tempSource = source {
@@ -357,7 +343,6 @@ public class InjectionServer: SimpleSocket {
                         }
                     }
                 }
-            }
         }
     }
 
